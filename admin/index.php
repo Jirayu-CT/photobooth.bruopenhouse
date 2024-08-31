@@ -1,70 +1,62 @@
 <?php
 session_start();
-date_default_timezone_set('Asia/Bangkok');
-
-// Handle logout
-if (isset($_GET['logout'])) {
-    session_unset();
-    session_destroy();
-    header("Location: login.php");
-}
 
 if (!isset($_SESSION['userid']) || $_SESSION['userid'] != 'admin') {
     header('Location: login.php');
 }
 
-include('../config.php');
+include('../function.php');
+saveConfig(CONFIGFILE_ADMIN);
 
-if (isset($_GET['download'])) {
-    require_once 'zipclass.php';
-
-    $zip = new GoodZipArchive();
-
-    $inputFolder = '../uptmp';
-    $outputZipFile = 'openhouse-photo.zip';
-
-    // Create the zip archive
-    $zip->create_func($inputFolder, $outputZipFile);
-
-    // Check if the zip file was created successfully
-    if (file_exists($outputZipFile)) {
-        // Set headers to force download of the zip file
-        header('Content-Type: application/zip');
-        header('Content-Disposition: attachment; filename="' . basename($outputZipFile) . '"');
-        header('Content-Length: ' . filesize($outputZipFile));
-        readfile($outputZipFile);
-        unlink($outputZipFile);
-    } else {
-        echo 'Error: Could not create the zip file.';
-    }
-}
-
-// Handle session expiration
-if (isset($_SESSION['LAST_ACTIVITY']) && (time() - $_SESSION['LAST_ACTIVITY'] > 86400)) {
-    session_unset();
-    session_destroy();
-}
-
-$directory = "../uptmp";
-$images = array_slice(glob("$directory/*.png"), 0, 10);
-$new_images = [];
-
-foreach ($images as $img) {
-    $new_images[filemtime($img)] = $img;
-}
-krsort($new_images);
-
+$config = loadConfig(CONFIGFILE_ADMIN);
 ?>
+
 <!DOCTYPE html>
-<html lang="th">
+<html lang="en">
 
 <head>
-    <meta charset="utf-8">
+    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BRU Open House | Project v6.2111</title>
-    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-    <script src="../js/qrcode.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/lazyload@2.0.0-rc.2/lazyload.js"></script>
+    <title>Photo Booth Configuration</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.min.js"></script>
+    <link rel="stylesheet" href="https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
+    <style>
+        #photo-booth-container {
+            position: relative;
+            /* display: inline-block; */
+        }
+
+        #photo-booth-frame {
+            /* position: relative;
+             background-image: url(''); 
+            background-size: cover;
+            border: 1px solid #000; */
+
+            position: relative;
+            background-size: cover;
+            background-position: center;
+            border: 1px solid #000;
+            width: 100%; /* Use percentage width to be responsive */
+            height: 0;
+            padding-bottom: 56.25%; /* 16:9 aspect ratio */
+        }
+
+        .photo-area {
+            position: absolute;
+            background-color: rgba(255, 255, 255, 0.5);
+            border: 2px dashed #000;
+        }
+
+        #frame-controls {
+            margin-bottom: 10px;
+        }
+
+        #frame-controls input {
+            width: 50px;
+        }
+    </style>
 </head>
 
 <body class="bg-gray-900 text-gray-100">
@@ -74,7 +66,7 @@ krsort($new_images);
             <div class="hidden md:flex space-x-4">
                 <a href="index.php" class="hover:bg-gray-700 px-4 py-2 rounded">Home</a>
                 <a href="setup.php" class="hover:bg-gray-700 px-4 py-2 rounded">Setup</a>
-                <a href="?logout" class="hover:bg-gray-700 px-4 py-2 rounded">Logout</a>
+                <a href="index.php?logout" class="hover:bg-gray-700 px-4 py-2 rounded">Logout</a>
             </div>
             <button id="menu-toggle" class="md:hidden text-2xl">
                 <i class="fas fa-bars"></i>
@@ -83,80 +75,421 @@ krsort($new_images);
         <div id="menu" class="md:hidden bg-gray-800 text-white p-4 space-y-2 hidden">
             <a href="index.php" class="block hover:bg-gray-700 px-4 py-2 rounded">Home</a>
             <a href="setup.php" class="block hover:bg-gray-700 px-4 py-2 rounded">Setup</a>
-            <a href="?logout" class="block hover:bg-gray-700 px-4 py-2 rounded">Logout</a>
+            <a href="index.php?logout" class="block hover:bg-gray-700 px-4 py-2 rounded">Logout</a>
         </div>
     </nav>
 
+    <main class="container mx-auto p-6">
+        <section class="bg-gray-800 shadow-md rounded-lg p-6 mb-6">
+            <div class="flex items-center space-x-4 mb-4">
+                <input type="file" id="frameImage"
+                    class="file-input px-4 py-2 border border-gray-600 rounded-lg shadow-sm bg-gray-700 text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 transition" />
+                <button id="addRectangle"
+                    class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition">Add
+                    Rectangle</button>
+                <button id="removeRectangle"
+                    class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition">Remove
+                    Rectangle</button>
+                <button id="saveConfig"
+                    class="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition">Save</button>
+            </div>
 
-    <div class="container mx-auto p-6">
-        <div class="mb-6">
-            <h2 class="text-2xl font-bold text-gray-100 mb-4">Photo <small class="text-sm">(<?= count($images) ?> รูป)</small></h2>
-            <a class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition" href="?download">Download .zip</a>
-            <hr class="my-4">
-        </div>
-        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            <?php foreach ($new_images as $image): ?>
-                <div data-qrcode="qrcode-<?= htmlspecialchars(basename($image, ".png")) ?>" data-link="<?= ENPOINT_URL_DOWNLOAD ?>/download.php?id=<?= basename($image, ".png") ?>" id="showImageButton" class="bg-gray-800 rounded-lg overflow-hidden shadow-lg relative" style="width: 75%;">
-                    <img class="lazyload w-full h-auto" src="<?= htmlspecialchars($image) ?>" alt="Image">
-                    <div id="qrcode-<?= htmlspecialchars(basename($image, ".png")) ?>" class="hidden" v-loading="PanoramaInfo.bgenerateing">
-                        <!-- QR Code will be generated here -->
-                    </div>
-                    <div class="p-4 text-center">
-                        <small><?= htmlspecialchars(basename($image, ".png")) ?></small>
-                    </div>
+            <div id="photo-booth-container"
+                class="flex justify-between relative bg-gray-900 border border-gray-600 rounded-lg p-4">
+                <div id="photo-booth-frame" class="relative rounded-lg overflow-hidden bg-gray-800">
+                    <!-- Configured areas will be added dynamically here -->
                 </div>
-                <script>
-                    new QRCode(document.getElementById("qrcode-<?= htmlspecialchars(basename($image, ".png")) ?>"), {
-                        text: "<?= ENPOINT_URL_DOWNLOAD ?>/download.php?id=<?= basename($image, ".png") ?>",
-                        width: 450,
-                        height: 450,
-                        colorDark: "#363636",
-                        colorLight: "#f5f5f5",
-                        correctLevel: QRCode.CorrectLevel.L
+                <div id="photo-booth-render" class="relative rounded-lg overflow-hidden bg-gray-800">
+
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <video id="video" class="hidden" autoplay></video>
+    <canvas id="canvasx" class="hidden"></canvas>
+
+    <script src="//cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/js-cookie/3.0.1/js.cookie.js"
+        integrity="sha512-DJw15+xxGmXB1/c6pvu2eRoVCGo5s6rdeswkFS4HLFfzNQSc6V71jk6t+eMYzlyakoLTwBrKnyhVc7SCDZOK4Q=="
+        crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+
+    <script>
+        $(document).ready(function () {
+            <?php if ($config != null): ?>
+                var savedConfig = <?= json_encode($config) ?>;
+            <?php else: ?>
+                var savedConfig = {};
+            <?php endif; ?>
+
+            var cameraStream = null
+            var canvas = $('#canvasx')[0];
+            var video = $('#video')[0];
+            var rectangleCount = 1;
+            let frameSize = {
+                width: 0,
+                height: 0
+            };
+            let frameOffset = {
+                x: 0,
+                y: 0
+            };
+            var frameimg, canvas_obj, ctx = null;
+            var frameBG = new Image();
+
+            var camera_device = null
+
+            const getCameraSelection = async () => {
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                const videoDevices = devices.filter(device => device.kind === 'videoinput');
+
+                var options;
+                var device_name = [];
+                videoDevices.map(videoDevice => {
+                    options += '<option value="' + videoDevice.deviceId + '">' + videoDevice.label + '</option>';
+                });
+
+                Swal.fire({
+                    title: 'Setup Camera',
+                    html: '<small>เลือกกล้อง<small><div class="control has-icons-left">' +
+                        '<div class="select is-large">' +
+                        '<select id="optionDevice">' + options + '</select>' +
+                        '</div>' +
+                        '</div>',
+                    showCancelButton: false,
+                    allowOutsideClick: false,
+                    allowEscapeKey: false,
+                    confirmButtonText: 'ยืนยัน',
+                    buttonsStyling: false,
+                    customClass: {
+                        confirmButton: "button is-link pd-btn"
+                    }
+                }).then((result) => {
+                    let od = document.getElementById('optionDevice');
+                    if (result.isConfirmed) {
+                        camera_device = od.value;
+                        Cookies.set('device', od.value);
+                        window.location = '?success';
+                    }
+                });
+            };
+
+            if (!Cookies.get('device')) {
+                getCameraSelection();
+            } else {
+                camera_device = Cookies.get('device');
+                console.log('test')
+            }
+
+            function startCamera() {
+                navigator.mediaDevices.getUserMedia({
+                    video: true,
+                    deviceId: {
+                        exact: camera_device
+                    }
+                })
+                    .then(function (stream) {
+                        cameraStream = stream;
+                        video.srcObject = stream; // Set the video source to the stream
+                    })
+                    .catch(function (error) {
+                        console.error('Error accessing camera: ', error);
                     });
-                </script>
-            <?php endforeach; ?>
-        </div>
-    </div>
+            }
 
-    <!-- Modal structure for image display -->
-    <div id="imageModal" class="fixed inset-0 bg-gray-800 bg-opacity-75 flex items-center justify-center hidden">
-        <div class="bg-white p-4 rounded relative max-w-lg mx-auto">
-            <img id="modalImage" src="" alt="QR Code" class="max-w-full max-h-screen">
+            function stopCamera() {
+                if (cameraStream) {
+                    cameraStream.getTracks().forEach(function (track) {
+                        track.stop(); // Stop each track
+                    });
+                    video.srcObject = null; // Remove the stream from the video element
+                }
+            }
 
-            <!-- Footer with buttons -->
-            <footer class="mt-4 flex justify-center space-x-4">
-                <a id="downloadButton" class="px-4 py-2 bg-indigo-500 text-white rounded">Download</a>
-                <button id="closeModalButton" class="px-4 py-2 bg-gray-600 text-white rounded">Close</button>
-            </footer>
-        </div>
-    </div>
 
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <script>
-        $(document).ready(function() {
-            $('#showImageButton').on('click', function() {
-                qrcodeid = $(this).data('qrcode')
-                qrcodeLink = $(this).data('link')
-                image = $('#' + qrcodeid + ' > img')[0].currentSrc
-   
-                $('#downloadButton').attr('href', qrcodeLink)
-                $('#modalImage').attr('src', image);
-                $('#imageModal').removeClass('hidden');
+            function captureCamera() {
+                var context = canvas.getContext('2d');
+                if (video.readyState === video.HAVE_ENOUGH_DATA) {
+
+
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+
+                    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+                    var dataURL = canvas.toDataURL('image/png');
+                    return dataURL
+                } else {
+                    console.error('Video is not ready for capture.');
+                }
+            };
+
+
+            $('#frameImage').on('change', function (event) {
+                var file = event.target.files[0];
+                if (file) {
+                    var reader = new FileReader();
+
+                    reader.onload = function (e) {
+                        frameBG.src = e.target.result
+
+                        $('#photo-booth-frame').css('background-image', 'url(' + e.target.result + ')');
+                        startCamera();
+                        setupFrame()
+                        renderBG()
+                    };
+
+                    reader.readAsDataURL(file);
+                }
             });
 
-            $('#closeModalButton').on('click', function() {
-                $('#imageModal').addClass('hidden');
+            function renderBG() {
+                frameimg = new Image();
+                frameimg.src = frameBG.src
+                canvas_obj = document.createElement("canvas");
+                $('#photo-booth-render').html(canvas_obj);
+                canvas_obj.classList.add('d-none');
+                ctx = canvas_obj.getContext("2d");
+
+                frameimg.onload = function () {
+                    canvas_obj.width = frameimg.width;
+                    canvas_obj.height = frameimg.height;
+                }
+
+            }
+
+
+            function drawImage(url, x, y, w, h) {
+                var img = new Image();
+                img.src = captureCamera();
+                img.onload = function () {
+                    ctx.drawImage(frameimg, 0, 0, canvas_obj.width, canvas_obj.height);
+
+                    var aspectRatio = img.width / img.height;
+                    var newWidth, newHeight;
+
+                    if (w / h > aspectRatio) {
+                        newHeight = h;
+                        newWidth = h * aspectRatio;
+                    } else {
+                        newWidth = w;
+                        newHeight = w / aspectRatio;
+                    }
+
+                    var xOffset = x + (w - newWidth) / 2;
+                    var yOffset = y + (h - newHeight) / 2;
+
+                    ctx.drawImage(img, xOffset, yOffset, newWidth, newHeight);
+                    imgs = canvas_obj.toDataURL("image/png");
+                };
+            }
+
+            function setupFrame() {
+                var img = new Image();
+                img.onload = function () {
+                    frameSize.width = img.width;
+                    frameSize.height = img.height;
+                    $('#photo-booth-frame').css({
+                        width: frameSize.width,
+                        height: frameSize.height
+                    });
+
+                    let containerRect = $('#photo-booth-container')[0].getBoundingClientRect();
+                    let frameRect = $('#photo-booth-frame')[0].getBoundingClientRect();
+                    frameOffset.x = frameRect.left - containerRect.left;
+                    frameOffset.y = frameRect.top - containerRect.top;
+
+                    if (savedConfig) {
+                        for (let areaId in savedConfig) {
+                            let areaConfig = savedConfig[areaId];
+                            var newRectangle = $('<div class="photo-area"></div>').attr('id', areaId);
+                            $('#photo-booth-frame').append(newRectangle);
+                            $('#' + areaId).css({
+                                top: areaConfig.top,
+                                left: areaConfig.left,
+                                width: areaConfig.width,
+                                height: areaConfig.height
+                            });
+                            newRectangle.resizable({
+                                containment: "#photo-booth-frame",
+                                stop: updateConfig
+                            }).draggable({
+                                containment: "#photo-booth-frame",
+                                stop: updateConfig
+                            });
+                            newRectangle.click(function () {
+                                $('.photo-area').removeClass('selected');
+                                $(this).addClass('selected');
+                            });
+                        }
+                    }
+
+                    updateConfig();
+                };
+                img.src = frameBG.src
+
+            }
+
+            function addRectangle() {
+                rectangleCount++;
+                var newRectangle = $('<div class="photo-area"></div>').attr('id', 'box' + rectangleCount);
+
+                $('#photo-booth-frame').append(newRectangle);
+                $('#box' + rectangleCount).css({
+                    top: 50 + rectangleCount * 50,
+                    left: 50,
+                    width: 150,
+                    height: 150
+                });
+
+                newRectangle.resizable({
+                    containment: "#photo-booth-frame",
+                    stop: updateConfig
+                }).draggable({
+                    containment: "#photo-booth-frame",
+                    stop: updateConfig
+                });
+
+                newRectangle.click(function () {
+                    $('.photo-area').removeClass('selected');
+                    $(this).addClass('selected');
+                });
+
+                updateConfig();
+            }
+
+            function removeSelectedRectangle() {
+                var selectedElement = $('.photo-area.selected');
+
+                if (selectedElement.length) {
+                    console.log("Removing element with ID:", selectedElement.attr('id'));
+                    selectedElement.remove();
+                    updateConfig();
+                } else {
+                    console.log("No rectangle selected");
+                }
+            }
+
+            $('#addRectangle').click(addRectangle);
+            $('#removeRectangle').click(removeSelectedRectangle);
+
+
+            $('.photo-area').resizable({
+                containment: "#photo-booth-frame",
+                stop: updateConfig
+            }).draggable({
+                containment: "#photo-booth-frame",
+                stop: updateConfig
             });
+
+            function updateVideoSize() {
+                const video = $('#video')[0];
+                const frame = $('#photo-booth-frame')[0];
+
+                // Get the dimensions of the frame
+                const frameWidth = frame.clientWidth;
+                const frameHeight = frame.clientHeight;
+
+                // Set the dimensions of the video to match the frame
+                video.style.width = `${frameWidth}px`;
+                video.style.height = `${frameHeight}px`;
+            }
+
+            function updateConfig() {
+                let config = {};
+                $('.photo-area').each(function () {
+                    let $this = $(this);
+                    let position = $this.position();
+
+                    config[this.id] = {
+                        top: position.top,
+                        left: position.left,
+                        width: $this.width(),
+                        height: $this.height()
+                    };
+                    drawImage('test2.png', position.left, position.top, $this.width(), $this.height());
+                });
+            }
+
+            $('#saveConfig').click(function () {
+                let config = {};
+
+                $('.photo-area').each(function () {
+                    let $this = $(this);
+                    let position = $this.position();
+                    if (position.top != 0 && position.left != 0 && $this.width() != 0 && $this.height() != 0) {
+                        config[this.id] = {
+                            top: position.top,
+                            left: position.left,
+                            width: $this.width(),
+                            height: $this.height()
+                        };
+                    }
+                });
+
+                if (Object.keys(config).length === 0) {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'คุณยังไม่ได้สร้าง Rectangle',
+                        showCancelButton: false,
+                        allowOutsideClick: false,
+                        allowEscapeKey: false,
+                        confirmButtonText: 'ยืนยัน',
+                    });
+                    return;
+                }
+
+                // Convert the frame image to a data URL
+                var frameImage = $('#photo-booth-frame').css('background-image').replace(/^url\(["']?/, '').replace(/["']?\)$/, '');
+                var imageData = '';
+
+                if (frameImage) {
+                    var img = new Image();
+                    img.crossOrigin = 'Anonymous'; // Handle cross-origin images if necessary
+                    img.onload = function () {
+                        var canvas = document.createElement('canvas');
+                        var ctx = canvas.getContext('2d');
+                        canvas.width = img.width;
+                        canvas.height = img.height;
+                        ctx.drawImage(img, 0, 0);
+                        imageData = canvas.toDataURL('image/png');
+
+                        // Send the configuration and image data to the server
+                        $.post('', {
+                            config: JSON.stringify(config),
+                            image: imageData
+                        }).done(function (response) {
+                            Swal.fire({
+                                icon: 'success',
+                                title: 'DONE',
+                                showCancelButton: false,
+                                allowOutsideClick: false,
+                                allowEscapeKey: false,
+                                confirmButtonText: 'ยืนยัน',
+                            });
+                            console.log("Configuration saved:", response);
+                        }).fail(function (jqXHR, textStatus, errorThrown) {
+                            console.error("Request failed:", textStatus, errorThrown);
+                        });
+                    };
+                    img.src = frameImage;
+                } else {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'เลือกรูปก่อนบันทึกข้อมูล',
+                        showCancelButton: false,
+                        allowOutsideClick: false,
+                        allowEscapeKey: false,
+                        confirmButtonText: 'ยืนยัน',
+                    });
+                }
+            });
+
+
 
         });
 
-    </script>
-    <script>
-        document.querySelectorAll("img.lazyload").forEach(img => img.classList.add('lazy'));
-        document.getElementById('menu-toggle').addEventListener('click', () => {
-            document.getElementById('menu').classList.toggle('hidden');
-        });
     </script>
 
 </body>

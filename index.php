@@ -261,13 +261,9 @@ $base64 = 'data:image/' . $type . ';base64,' . base64_encode($data);
 
         constraints = {
             video: {
-                width: {
-                    ideal: 1856
-                },
-                height: {
-                    ideal: 1392
-                },
-            }
+                width: { ideal: 1920 },
+                height: { ideal: 1080 },
+                aspectRatio: 16 / 9}
         };
 
         // เริ่มการสตรีมวิดีโอเมื่อคลิกปุ่มเริ่ม
@@ -295,6 +291,10 @@ $base64 = 'data:image/' . $type . ';base64,' . base64_encode($data);
                 }
                 c.html("");
 
+                // กำหนดขนาดของแคนวาสให้เป็นสัดส่วน 16:9
+                canvas.width = 1920; // Example width
+                canvas.height = 1080; // Example height
+
                 canvas.width = video.videoWidth;
                 canvas.height = video.videoHeight;
 
@@ -302,7 +302,7 @@ $base64 = 'data:image/' . $type . ';base64,' . base64_encode($data);
                 canvas.getContext('2d').filter = 'brightness(1.1) contrast(1.2) saturate(1.3) sharpen(1.1)';;
                 // canvas.getContext('2d').translate(canvas.width, 0);
                 // canvas.getContext('2d').scale(-1,1); 
-                canvas.getContext('2d').drawImage(video, 0, 0);
+                canvas.getContext('2d').drawImage(video, 0, 0), canvas.width, canvas.height;
 
                 cdisplay.classList.add('blur');
                 // start_loader.classList.add('force-loader');
@@ -433,10 +433,13 @@ $base64 = 'data:image/' . $type . ';base64,' . base64_encode($data);
 
         // ฟังก์ชันคำนวณอัตราส่วนภาพ
         function aspectRatio(img, x, y, w, h) {
-            var aspectRatio = img.width / img.height;
+            // สัดส่วน 16:9
+            var aspectRatio = 16 / 9;
             var newWidth, newHeight;
 
+            // ตรวจสอบสัดส่วนของกรอบเทียบกับสัดส่วนที่ต้องการ
             if (w / h > aspectRatio) {
+                // ถ้าสัดส่วนของกรอบกว้างกว่าสัดส่วนที่ต้องการ
                 newHeight = h;
                 newWidth = h * aspectRatio;
             } else {
@@ -510,11 +513,11 @@ $base64 = 'data:image/' . $type . ';base64,' . base64_encode($data);
                                             <figure class="m-0 mx-auto">
                                                 <img src="${imgs}" alt="" width="250px">
                                             </figure>
-                                            <div class="position-absolute top-10 start-50 translate-middle card p-3 bg-light rounded shadow">
+                                            <!-- <div class="position-absolute top-10 start-50 translate-middle card p-3 bg-light rounded shadow">
                                                 <div id="qrcode" class="v-loading="PanoramaInfo.bgenerateing">
-                                                    <!-- QR Code will be generated here -->
+                                                    <!-- QR Code will be generated here 
                                                 </div>
-                                            </div>
+                                            </div>-->
                                         </div>
                                 `,
                     timer: 120000,
@@ -528,14 +531,14 @@ $base64 = 'data:image/' . $type . ';base64,' . base64_encode($data);
                     didOpen: () => {
                         /* Swal.showLoading() */
                         const b = Swal.getHtmlContainer().querySelector('b')
-                        let qrcode = new QRCode(document.getElementById("qrcode"), {
-                            text: "<?= ENPOINT_URL_DOWNLOAD ?>/download.php?id=" + picId,
-                            width: 150,
-                            height: 150,
-                            colorDark: "#363636",
-                            colorLight: "#f5f5f5",
-                            correctLevel: QRCode.CorrectLevel.L
-                        });
+                        // let qrcode = new QRCode(document.getElementById("qrcode"), {
+                        //     text: "<?= ENPOINT_URL_DOWNLOAD ?>/download.php?id=" + picId,
+                        //     width: 150,
+                        //     height: 150,
+                        //     colorDark: "#363636",
+                        //     colorLight: "#f5f5f5",
+                        //     correctLevel: QRCode.CorrectLevel.L
+                        // });
                         timerInterval = setInterval(() => {
                             b.textContent = Math.round(Swal.getTimerLeft() / 1000);
                             if (count_a > 1) {

@@ -325,14 +325,30 @@ $config = loadConfig(CONFIGFILE_ADMIN);
                 rectangleCount++;
                 var newRectangle = $('<div class="photo-area"></div>').attr('id', 'box' + rectangleCount);
 
+                // กำหนดขนาดของกรอบรูปตามอัตราส่วน 16:9
+                var width = 551; // กำหนดความกว้างตามที่ต้องการ
+                var height = (width / 16) * 9; // คำนวณความสูงตามอัตราส่วน 16:9
+
+                // เพิ่มกรอบรูปลงในพื้นที่กำหนด
                 $('#photo-booth-frame').append(newRectangle);
                 $('#box' + rectangleCount).css({
-                    top: 50 + rectangleCount * 50,
-                    left: 50,
-                    width: 150,
-                    height: 150
+                    top: 50 + rectangleCount * 50, // ตำแหน่งแนวตั้ง
+                    left: 50, // ตำแหน่งแนวนอน
+                    width: width,
+                    height: height
                 });
 
+                $('#video').css({
+                    width: width + 'px',  // ตั้งค่าความกว้างให้เท่ากับกรอบรูป
+                    height: height + 'px', // ตั้งค่าความสูงให้เท่ากับกรอบรูป
+                    position: 'absolute', // ทำให้วิดีโออยู่ในตำแหน่งเดียวกับกรอบรูป
+                    top: $('#box' + rectangleCount).position().top + 'px', 
+                    left: $('#box' + rectangleCount).position().left + 'px',
+                    objectFit: 'cover', // ทำการครอบ (crop) วิดีโอเพื่อให้เต็มกรอบรูป
+                    zIndex: -1 // ทำให้วิดีโออยู่ด้านหลังกรอบรูป
+                });
+
+                // เปิดใช้งานการลากและปรับขนาดกรอบรูป
                 newRectangle.resizable({
                     containment: "#photo-booth-frame",
                     stop: updateConfig
@@ -341,6 +357,7 @@ $config = loadConfig(CONFIGFILE_ADMIN);
                     stop: updateConfig
                 });
 
+                // คลิกเพื่อเลือกกรอบรูป
                 newRectangle.click(function () {
                     $('.photo-area').removeClass('selected');
                     $(this).addClass('selected');
@@ -348,6 +365,7 @@ $config = loadConfig(CONFIGFILE_ADMIN);
 
                 updateConfig();
             }
+
 
             function removeSelectedRectangle() {
                 var selectedElement = $('.photo-area.selected');

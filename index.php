@@ -117,6 +117,7 @@ $base64 = 'data:image/' . $type . ';base64,' . base64_encode($data);
                     }
                 })
         }
+
     </style>
 </head>
 
@@ -261,8 +262,10 @@ $base64 = 'data:image/' . $type . ';base64,' . base64_encode($data);
 
         constraints = {
             video: {
-                width: { ideal: 1920 },
-                height: { ideal: 1080 },
+                // width: 3840,
+                // height: 2160,
+                width: { ideal: 3840}, //1920
+                height: { ideal: 2160}, //1080
                 aspectRatio: 16 / 9}
         };
 
@@ -292,8 +295,8 @@ $base64 = 'data:image/' . $type . ';base64,' . base64_encode($data);
                 c.html("");
 
                 // กำหนดขนาดของแคนวาสให้เป็นสัดส่วน 16:9
-                canvas.width = 1920; // Example width
-                canvas.height = 1080; // Example height
+                canvas.width = 3840; // Example width 1920 3840
+                canvas.height = 2160; // Example height 1080 2160
 
                 canvas.width = video.videoWidth;
                 canvas.height = video.videoHeight;
